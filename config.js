@@ -5,5 +5,5 @@
 // (see README.md, step 2) between the quotes below. It looks like:
 // https://script.google.com/macros/s/AKfycb.../exec
 window.NIS_CONFIG = {
-  API_URL: "https://script.google.com/macros/s/AKfycbyTbabNjwMCGEM5-9-pa1zKufLWivGKFkdzCfvB8_VF4hCcXbzbD67OjjnepBCEdHAF/exec"
+  API_URL: "https://script.google.com/macros/s/AKfycbw9EKrC9J7i-TS2FJwRJoqGe4qbEWnlEfhPbmYhd1k0UWxecDmLU_Y7xwEqZDeWSRcaqA/exec"
 };
