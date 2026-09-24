@@ -26,11 +26,19 @@
     return j;
   }
   async function apiPost_(payload) {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids CORS preflight on Apps Script
-      body: JSON.stringify(payload)
-    });
+    let res;
+    try {
+      res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids CORS preflight on Apps Script
+        body: JSON.stringify(payload)
+      });
+    } catch (networkErr) {
+      // fetch() itself threw — this is a network/CORS-level failure, not
+      // something the backend responded to. Distinguish it clearly, since
+      // it points at the Apps Script deployment/URL, not the app logic.
+      throw new Error('เชื่อมต่อ API ไม่สำเร็จ (เครือข่าย/CORS) — เช็คว่า API_URL ถูกต้องและ deployment ตั้งค่า "Anyone" จริง: ' + networkErr.message);
+    }
     if (!res.ok) throw new Error('API error ' + res.status);
     const j = await res.json();
     if (j && j.error) throw new Error(j.error);
@@ -145,7 +153,7 @@
       a.href = url; a.download = filename;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-    } catch (e) { showToast('ไม่สามารถดาวน์โหลดได้', true); }
+    } catch (e) { console.error(e); showToast('ไม่สามารถดาวน์โหลดได้', true); }
   }
 
   async function downloadJSON(filename, obj) {
@@ -156,7 +164,7 @@
       a.href = url; a.download = filename;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-    } catch (e) { showToast('ไม่สามารถดาวน์โหลดได้', true); }
+    } catch (e) { console.error(e); showToast('ไม่สามารถดาวน์โหลดได้', true); }
   }
 
   // sheets: { "Sheet Name": [[header...], [row...], ...], ... }
@@ -169,7 +177,7 @@
         XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31)); // Excel sheet name limit = 31 chars
       });
       XLSX.writeFile(wb, filename);
-    } catch (e) { showToast('ไม่สามารถสร้างไฟล์ Excel ได้', true); }
+    } catch (e) { console.error(e); showToast('ไม่สามารถสร้างไฟล์ Excel ได้', true); }
   }
 
   async function exportDatabaseExcel() {
@@ -205,7 +213,7 @@
       sheets['ประวัติเช็คสต๊อก'] = scRows;
 
       downloadXLSX('nis-database-' + todayStr() + '.xlsx', sheets);
-    } catch (e) { showToast('ส่งออกไม่สำเร็จ', true); }
+    } catch (e) { console.error(e); showToast('ส่งออกไม่สำเร็จ', true); }
   }
 
   async function exportDatabaseJSON() {
@@ -214,7 +222,7 @@
       showToast('กำลังเตรียมไฟล์ JSON...');
       const j = await apiExportAll();
       downloadJSON('nis-database-' + todayStr() + '.json', j.data || {});
-    } catch (e) { showToast('ส่งออกไม่สำเร็จ', true); }
+    } catch (e) { console.error(e); showToast('ส่งออกไม่สำเร็จ', true); }
   }
   // A withdrawal only actually leaves the shelf once released at the
   // fulfillment counter. Older records (created before this status field
@@ -427,7 +435,7 @@
       showToast(isWithdraw ? 'ส่งคำขอเบิกสำเร็จ — กรุณารอรับของที่คลัง' : 'บันทึกการเติมสต๊อกสำเร็จ');
     } catch (e) {
       console.error(e);
-      showToast('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง', true);
+      showToast('เกิดข้อผิดพลาด — ' + (e && e.message ? e.message : 'ลองใหม่อีกครั้ง'), true);
     } finally {
       if (submitBtn) submitBtn.disabled = false;
       render();
@@ -455,7 +463,7 @@
       state.whEditCode = null;
       showToast('บันทึกข้อมูลสินค้าแล้ว');
     } catch (e) {
-      showToast('บันทึกไม่สำเร็จ', true);
+      showToast('บันทึกไม่สำเร็จ — ' + (e && e.message ? e.message : ''), true);
     }
     render();
   }
@@ -470,7 +478,7 @@
       else { products.push({ code, ...payload }); }
       state.whAdding = false;
       showToast('เพิ่มสินค้าใหม่แล้ว');
-    } catch (e) { showToast('เพิ่มสินค้าไม่สำเร็จ', true); }
+    } catch (e) { console.error(e); showToast('เพิ่มสินค้าไม่สำเร็จ — ' + (e && e.message ? e.message : ''), true); }
     render();
   }
 
@@ -480,7 +488,7 @@
       else { products = products.filter(p => p.code !== code); }
       state.whConfirmDelete = null;
       showToast('ลบสินค้าแล้ว');
-    } catch (e) { showToast('ลบไม่สำเร็จ', true); }
+    } catch (e) { console.error(e); showToast('ลบไม่สำเร็จ', true); }
     render();
   }
 
@@ -559,7 +567,7 @@
       if (apiAvailable) { await apiUpdate('products', code, { image: '' }); await loadProducts_(); }
       else { const idx = products.findIndex(p => p.code === code); if (idx > -1) products[idx].image = ''; }
       showToast('ลบรูปแล้ว');
-    } catch (e) { showToast('ลบรูปไม่สำเร็จ', true); }
+    } catch (e) { console.error(e); showToast('ลบรูปไม่สำเร็จ', true); }
     render();
   }
 
@@ -582,7 +590,7 @@
       if (apiAvailable) { await apiSet('auth_users', username, payload); await loadAuthUsers_(); }
       else { authUsers.push({ username, ...payload }); }
       showToast('เพิ่มผู้ใช้งานแล้ว');
-    } catch (e) { showToast('เพิ่มผู้ใช้งานไม่สำเร็จ', true); }
+    } catch (e) { console.error(e); showToast('เพิ่มผู้ใช้งานไม่สำเร็จ — ' + (e && e.message ? e.message : ''), true); }
     render();
   }
 
@@ -596,7 +604,7 @@
       else { authUsers = authUsers.filter(u => u.username !== username); }
       state.userConfirmDelete = null;
       showToast('ลบผู้ใช้งานแล้ว');
-    } catch (e) { showToast('ลบไม่สำเร็จ', true); }
+    } catch (e) { console.error(e); showToast('ลบไม่สำเร็จ', true); }
     render();
   }
 
@@ -897,7 +905,7 @@
         if (idx > -1) history[idx] = { ...history[idx], items: updatedItems.filter(it => it.qty > 0), total: newTotal, status: 'fulfilled' };
       }
       showToast('ปล่อยของสำเร็จ');
-    } catch (e) { showToast('เกิดข้อผิดพลาด ลองใหม่อีกครั้ง', true); }
+    } catch (e) { console.error(e); showToast('เกิดข้อผิดพลาด — ' + (e && e.message ? e.message : 'ลองใหม่อีกครั้ง'), true); }
     render();
   }
 
@@ -912,7 +920,7 @@
       }
       state.fulfillConfirmCancel = null;
       showToast('ยกเลิกคำขอแล้ว');
-    } catch (e) { showToast('ยกเลิกไม่สำเร็จ', true); }
+    } catch (e) { console.error(e); showToast('ยกเลิกไม่สำเร็จ', true); }
     render();
   }
 
@@ -1025,7 +1033,7 @@
       }
       state.stockCountNotes = '';
       showToast(`บันทึกผลการเช็คสต๊อกสำเร็จ — พบผลต่าง ${changed.length} จาก ${items.length} รายการ`);
-    } catch (e) { showToast('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง', true); }
+    } catch (e) { console.error(e); showToast('บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง', true); }
     if (btn) btn.disabled = false;
     render();
   }
@@ -1245,7 +1253,7 @@
   async function bulkImportProducts(file) {
     if (!file) return;
     let rows;
-    try { rows = await fileToRows_(file); } catch (e) { showToast('อ่านไฟล์ไม่สำเร็จ — ต้องเป็น .csv หรือ .xlsx เท่านั้น', true); return; }
+    try { rows = await fileToRows_(file); } catch (e) { console.error(e); showToast('อ่านไฟล์ไม่สำเร็จ — ต้องเป็น .csv หรือ .xlsx เท่านั้น', true); return; }
     if (!rows || rows.length < 2) { showToast('ไม่พบข้อมูลในไฟล์ (แถวแรกต้องเป็นหัวตาราง)', true); return; }
 
     const dataRows = rows.slice(1); // skip header row
